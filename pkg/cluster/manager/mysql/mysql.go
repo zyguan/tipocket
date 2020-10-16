@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"github.com/jinzhu/gorm"
 	"github.com/juju/errors"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // DB ...
@@ -12,7 +13,7 @@ type DB struct {
 
 // Open ...
 func Open(dsn string) (*DB, error) {
-	db, err := gorm.Open("mysql", dsn)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, errors.Trace(err)
 	}

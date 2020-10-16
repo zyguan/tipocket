@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/juju/errors"
 	"github.com/spf13/cobra"
+	_ "gorm.io/driver/mysql"
 
 	"github.com/pingcap/tipocket/pkg/cluster/manager/apiserver"
 	"github.com/pingcap/tipocket/pkg/cluster/manager/util"

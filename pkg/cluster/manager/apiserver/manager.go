@@ -44,7 +44,6 @@ func New(dsn string) (*Manager, error) {
 
 // Run ...
 func (m *Manager) Run() (err error) {
-	defer m.DB.Close()
 	m.migrate()
 	m.runWatcher(context.TODO())
 	m.runServer()

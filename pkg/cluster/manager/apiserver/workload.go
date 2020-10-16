@@ -11,10 +11,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
-	"github.com/jinzhu/gorm"
 	"github.com/juju/errors"
 	"github.com/rogpeppe/fastuuid"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"github.com/pingcap/tipocket/pkg/cluster/manager/deploy"
 	"github.com/pingcap/tipocket/pkg/cluster/manager/types"
@@ -171,6 +171,12 @@ func (m *Manager) runClusterWorkload(
 		zap.Uint("cr_id", cr.ID))
 
 	artifactUUID := fastuuid.MustNewGenerator().Hex128()
+	if err := m.Artifacts.CreateArtifacts(m.DB.DB, &types.Artifacts{
+		CRID: cr.ID,
+		UUID: artifactUUID,
+	}); err != nil {
+		return errors.Trace(err)
+	}
 	if wr.RestorePath != nil && *wr.RestorePath != "" {
 		rriItemID2Resource, component2Resources := types.BuildClusterMap(resources, rris)
 		rs, err = util.RandomResource(component2Resources["pd"])
@@ -181,6 +187,7 @@ func (m *Manager) runClusterWorkload(
 		if out, err := workload.RestoreData(*wr.RestorePath, rs.IP, rriItemID2Resource[wr.RRIItemID].IP); err != nil {
 			errResult = multierror.Append(errResult, err)
 			zap.L().Error("restore data failed", zap.Uint("cr_id", cr.ID), zap.String("output", out.String()))
+			m.archiveRestoreLogs(cr.ID, topo, out, artifactUUID)
 			goto DestroyCluster
 		}
 		zap.L().Info("restore data success", zap.Uint("cr_id", cr.ID), zap.String("restore_path", *wr.RestorePath))

@@ -1,6 +1,6 @@
 package types
 
-import "github.com/jinzhu/gorm"
+import "gorm.io/gorm"
 
 // Artifacts ...
 // 1. prometheus/grafana archive data

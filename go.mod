@@ -26,7 +26,6 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/grafana/loki v1.3.1-0.20200316172301-1eb139c37c1c
 	github.com/hashicorp/go-multierror v1.1.0
-	github.com/jinzhu/gorm v1.9.16
 	github.com/jpillora/backoff v1.0.0
 	github.com/juju/errors v0.0.0-20190930114154-d42613fe1ab9
 	github.com/mailru/easyjson v0.7.6 // indirect
@@ -64,6 +63,8 @@ require (
 	golang.org/x/tools v0.0.0-20200921210052-fa0125251cc4 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gorm.io/driver/mysql v1.0.2
+	gorm.io/gorm v1.20.2
 	k8s.io/api v0.19.2
 	k8s.io/apiextensions-apiserver v0.19.2 // indirect
 	k8s.io/apimachinery v0.19.2

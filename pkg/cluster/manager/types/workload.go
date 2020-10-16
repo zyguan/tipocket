@@ -4,8 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/jinzhu/gorm"
 	"github.com/juju/errors"
+	"gorm.io/gorm"
 )
 
 const (

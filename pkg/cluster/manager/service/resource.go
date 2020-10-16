@@ -3,8 +3,8 @@ package service
 import (
 	"sync"
 
-	"github.com/jinzhu/gorm"
 	"github.com/juju/errors"
+	"gorm.io/gorm"
 
 	"github.com/pingcap/tipocket/pkg/cluster/manager/mysql"
 	"github.com/pingcap/tipocket/pkg/cluster/manager/types"

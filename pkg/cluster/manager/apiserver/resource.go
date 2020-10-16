@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jinzhu/gorm"
 	"github.com/jpillora/backoff"
 	"github.com/juju/errors"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
 	"github.com/pingcap/tipocket/pkg/cluster/manager/types"
 )
