@@ -3,8 +3,6 @@ package types
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"time"
-
 	"github.com/juju/errors"
 	"gorm.io/gorm"
 )
@@ -88,9 +86,7 @@ type WorkloadRequest struct {
 
 // WorkloadReport means workload report
 type WorkloadReport struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        uint    `gorm:"primarykey"`
 	CRID      uint    `gorm:"column:cr_id;not null" json:"cr_id"`
 	Data      string  `gorm:"column:result;type:longtext;not null" json:"data"`
 	PlainText *string `gorm:"column:plaintext;type:longtext" json:"plaintext,omitempty"`

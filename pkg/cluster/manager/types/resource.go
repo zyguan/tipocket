@@ -120,7 +120,7 @@ type ResourceRequest struct {
 
 // ResourceRequestItem ...
 type ResourceRequestItem struct {
-	gorm.Model
+	ID           uint   `gorm:"primarykey"`
 	ItemID       uint   `gorm:"column:item_id;not null" json:"item_id"`
 	InstanceType string `gorm:"column:instance_type;type:varchar(100);not null" json:"instance_type"`
 	RRID         uint   `gorm:"column:rr_id;not null" json:"rr_id"`
@@ -131,7 +131,7 @@ type ResourceRequestItem struct {
 
 // ResourceRequestItemWithIP aggregates ResourceRequestItem with the ip field
 type ResourceRequestItemWithIP struct {
-	gorm.Model
+	ID           uint   `gorm:"primarykey"`
 	ItemID       uint   `gorm:"column:item_id;not null" json:"item_id"`
 	InstanceType string `gorm:"column:instance_type;type:varchar(100);not null" json:"instance_type"`
 	RRID         uint   `gorm:"column:rr_id;not null" json:"rr_id"`
