@@ -73,12 +73,16 @@ func (m *Manager) archiveArtifacts(
 	if err := artifacts.ArchiveMonitorData(s3Client, crID, artifactUUID, topos); err != nil {
 		zap.L().Error("archive monitor data failed", zap.Uint("cr_id", crID), zap.String("uuid", artifactUUID))
 	}
-	if err := artifacts.ArchiveWorkloadRuntimeLog(s3Client, crID, out, artifactUUID); err != nil {
-		zap.L().Error("archive workload stdout log failed", zap.Uint("cr_id", crID), zap.String("uuid", artifactUUID))
-	}
-	if wr.ArtifactDir != nil {
-		if err := artifacts.ArchiveWorkloadData(s3Client, dockerExecutor, containerID, crID, artifactUUID, *wr.ArtifactDir); err != nil {
+	if out != nil {
+		if err := artifacts.ArchiveWorkloadRuntimeLog(s3Client, crID, out, artifactUUID); err != nil {
 			zap.L().Error("archive workload stdout log failed", zap.Uint("cr_id", crID), zap.String("uuid", artifactUUID))
+		}
+	}
+	if dockerExecutor != nil {
+		if wr.ArtifactDir != nil {
+			if err := artifacts.ArchiveWorkloadData(s3Client, dockerExecutor, containerID, crID, artifactUUID, *wr.ArtifactDir); err != nil {
+				zap.L().Error("archive workload stdout log failed", zap.Uint("cr_id", crID), zap.String("uuid", artifactUUID))
+			}
 		}
 	}
 	zap.L().Info("archive artifacts success", zap.Uint("cr_id", crID), zap.String("uuid", artifactUUID))

@@ -160,9 +160,11 @@ func (m *Manager) runClusterWorkload(
 		rs             *types.Resource
 		dockerExecutor *util.DockerExecutor
 		errResult      error
+		artifactUUID   = fastuuid.MustNewGenerator().Hex128()
 	)
 	if topo, err = deploy.TryDeployCluster(cr.Name, resources, rris, cr, crts); err != nil {
-		return errors.Trace(err)
+		errResult = multierror.Append(errResult, err)
+		goto TearDown
 	}
 	if err := m.setOnline(rris, crts); err != nil {
 		return errors.Trace(err)
@@ -170,7 +172,6 @@ func (m *Manager) runClusterWorkload(
 	zap.L().Info("deploy and start cluster success",
 		zap.Uint("cr_id", cr.ID))
 
-	artifactUUID := fastuuid.MustNewGenerator().Hex128()
 	if err := m.Artifacts.CreateArtifacts(m.DB.DB, &types.Artifacts{
 		CRID: cr.ID,
 		UUID: artifactUUID,

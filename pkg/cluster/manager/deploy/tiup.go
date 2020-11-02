@@ -69,11 +69,12 @@ func TryDeployCluster(name string,
 
 	yaml := buildTopologyYaml(topo)
 	if err := deployCluster(topo, yaml, name, cr); err != nil {
-		return nil, errors.Trace(err)
+		return topo, errors.Trace(err)
 	}
 	if err := startCluster(name); err != nil {
-		return nil, errors.Trace(err)
+		return topo, errors.Trace(err)
 	}
+
 	// FIXME(mahjonp): replace it with heath check
 	// wait a moment for tidb providing service
 	time.Sleep(20 * time.Second)
