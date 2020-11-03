@@ -252,6 +252,7 @@ func patchCluster(topo *Topology, name string, cr *types.ClusterRequest) error {
 			if err := util.Unzip(filePath, dir); err != nil {
 				return errors.Trace(err)
 			}
+			_, err = util.Command(dir, "rm", "-rf", component.component)
 			if _, err := util.Command(dir, "mv", fmt.Sprintf("bin/%s", component.component), component.component); err != nil {
 				return errors.Trace(err)
 			}
