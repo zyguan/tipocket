@@ -169,9 +169,7 @@ func NewBinlogCluster(namespace, name string, conf fixture.TiDBClusterConfig) cl
 		ComponentSpec: v1alpha1.ComponentSpec{
 			Image: util.BuildImage("tidb-binlog", fixture.Context.TiDBClusterConfig.ImageVersion, fixture.Context.BinlogConfig.Image),
 		},
-		GenericConfig: config.GenericConfig{
-			Config: map[string]interface{}{},
-		},
+		Config: &config.GenericConfig{},
 	}
 
 	return NewCompositeCluster(

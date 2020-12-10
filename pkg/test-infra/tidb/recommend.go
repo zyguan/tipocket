@@ -112,10 +112,10 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 			},
 			Spec: v1alpha1.TidbClusterSpec{
 				Timezone:        "UTC",
-				PVReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
+				PVReclaimPolicy: &[]corev1.PersistentVolumeReclaimPolicy{corev1.PersistentVolumeReclaimDelete}[0],
 				EnablePVReclaim: &enablePVReclaim,
 				ImagePullPolicy: corev1.PullAlways,
-				PD: v1alpha1.PDSpec{
+				PD: &v1alpha1.PDSpec{
 					Replicas:             int32(clusterConfig.PDReplicas),
 					ResourceRequirements: fixture.WithStorage(fixture.Medium, "10Gi"),
 					StorageClassName:     &fixture.Context.LocalVolumeStorageClass,
@@ -123,7 +123,7 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 						Image: util.BuildImage("pd", clusterConfig.ImageVersion, clusterConfig.PDImage),
 					},
 				},
-				TiKV: v1alpha1.TiKVSpec{
+				TiKV: &v1alpha1.TiKVSpec{
 					Replicas: int32(clusterConfig.TiKVReplicas),
 					ResourceRequirements: fixture.WithStorage(corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -142,7 +142,7 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 						Image: util.BuildImage("tikv", clusterConfig.ImageVersion, clusterConfig.TiKVImage),
 					},
 				},
-				TiDB: v1alpha1.TiDBSpec{
+				TiDB: &v1alpha1.TiDBSpec{
 					Replicas: int32(clusterConfig.TiDBReplicas),
 					ResourceRequirements: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -243,11 +243,11 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 
 	if clusterConfig.TiFlashReplicas > 0 {
 		r.EnableTiFlash(clusterConfig)
-		r.TidbCluster.Spec.PD.Config = &v1alpha1.PDConfig{
-			Replication: &v1alpha1.PDReplicationConfig{
-				EnablePlacementRules: pointer.BoolPtr(true),
-			},
-		}
+		//r.TidbCluster.Spec.PD.Config = &v1alpha1.PDConfig{
+		//	Replication: &v1alpha1.PDReplicationConfig{
+		//		EnablePlacementRules: pointer.BoolPtr(true),
+		//	},
+		//}
 	}
 
 	for _, name := range strings.Split(fixture.Context.Nemesis, ",") {
