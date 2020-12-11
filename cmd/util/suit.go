@@ -30,7 +30,6 @@ import (
 	"github.com/pingcap/tipocket/pkg/control"
 	"github.com/pingcap/tipocket/pkg/core"
 	"github.com/pingcap/tipocket/pkg/history"
-	"github.com/pingcap/tipocket/pkg/loki"
 	"github.com/pingcap/tipocket/pkg/nemesis"
 	"github.com/pingcap/tipocket/pkg/test-infra/fixture"
 	"github.com/pingcap/tipocket/pkg/verify"
@@ -67,7 +66,7 @@ func (suit *Suit) Run(ctx context.Context) {
 	sctx, cancel := context.WithCancel(ctx)
 	// get the time before creating the tidb cluster
 	// note this is just a approximate value
-	startTime := time.Now()
+	//startTime := time.Now()
 
 	// Apply Matrix config
 	matrixEnabled, matrixSetupNodes, matrixCleanup, err := matrixnize(&clusterSpec)
@@ -106,12 +105,12 @@ func (suit *Suit) Run(ctx context.Context) {
 			suit.Config.ClientNodes[rand.Intn(retClientCount)])
 	}
 
-	// set loki client
-	var lokiCli *loki.Client
-	if fixture.Context.LokiAddress != "" {
-		lokiCli = loki.NewClient(startTime, fixture.Context.LokiAddress,
-			fixture.Context.LokiUsername, fixture.Context.LokiPassword)
-	}
+	//// set loki client
+	//var lokiCli *loki.Client
+	//if fixture.Context.LokiAddress != "" {
+	//	lokiCli = loki.NewClient(startTime, fixture.Context.LokiAddress,
+	//		fixture.Context.LokiUsername, fixture.Context.LokiPassword)
+	//}
 
 	// set plugins
 	suit.setDefaultPlugins()
@@ -124,7 +123,7 @@ func (suit *Suit) Run(ctx context.Context) {
 		suit.ClientRequestGen,
 		suit.VerifySuit,
 		suit.Plugins,
-		lokiCli,
+		//nil,
 		fixture.Context.LogPath,
 	)
 

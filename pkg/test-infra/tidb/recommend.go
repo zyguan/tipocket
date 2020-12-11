@@ -15,7 +15,6 @@ package tidb
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pingcap/tidb-operator/pkg/apis/pingcap/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -117,7 +116,7 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 				ImagePullPolicy: corev1.PullAlways,
 				PD: &v1alpha1.PDSpec{
 					Replicas:             int32(clusterConfig.PDReplicas),
-					ResourceRequirements: fixture.WithStorage(fixture.Medium, "10Gi"),
+					ResourceRequirements: fixture.WithStorage(fixture.Medium, "10Mi"),
 					StorageClassName:     &fixture.Context.LocalVolumeStorageClass,
 					ComponentSpec: v1alpha1.ComponentSpec{
 						Image: util.BuildImage("pd", clusterConfig.ImageVersion, clusterConfig.PDImage),
@@ -128,7 +127,7 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 					ResourceRequirements: fixture.WithStorage(corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							fixture.CPU:    resource.MustParse("500m"),
-							fixture.Memory: resource.MustParse("4Gi"),
+							fixture.Memory: resource.MustParse("2Gi"),
 						},
 						Limits: corev1.ResourceList{
 							fixture.CPU:    resource.MustParse("1000m"),
@@ -160,6 +159,13 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 						},
 						ExposeStatus: &exposeStatus,
 					},
+					StorageClassName: &fixture.Context.LocalVolumeStorageClass,
+					StorageVolumes: []v1alpha1.StorageVolume{{
+						Name:             "log",
+						// 50Gi for tidb_general_log
+						StorageSize:      "50Gi",
+						MountPath:        "/var/log/tidblog",
+					}},
 					// disable auto fail over
 					MaxFailoverCount: pointer.Int32Ptr(int32(0)),
 					ComponentSpec: v1alpha1.ComponentSpec{
@@ -250,32 +256,32 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 		//}
 	}
 
-	for _, name := range strings.Split(fixture.Context.Nemesis, ",") {
-		name := strings.TrimSpace(name)
-		if len(name) == 0 {
-			continue
-		}
-		switch name {
-		case "delay_tikv", "errno_tikv", "mixed_tikv", "readerr_tikv":
-			r.TidbCluster.Spec.TiKV.Annotations = map[string]string{
-				"admission-webhook.pingcap.com/request": "chaosfs-tikv",
-			}
-			r.InjectionConfigMaps = append(r.InjectionConfigMaps,
-				newIOChaosConfigMap(r.Namespace, "tikv", ioChaosConfigTiKV))
-		case "delay_pd", "errno_pd", "mixed_pd":
-			r.TidbCluster.Spec.PD.Annotations = map[string]string{
-				"admission-webhook.pingcap.com/request": "chaosfs-pd",
-			}
-			r.InjectionConfigMaps = append(r.InjectionConfigMaps,
-				newIOChaosConfigMap(r.Namespace, "pd", ioChaosConfigPD))
-		case "delay_tiflash", "errno_tiflash", "mixed_tiflash", "readerr_tiflash":
-			r.TidbCluster.Spec.TiFlash.Annotations = map[string]string{
-				"admission-webhook.pingcap.com/request": "chaosfs-tiflash",
-			}
-			r.InjectionConfigMaps = append(r.InjectionConfigMaps,
-				newIOChaosConfigMap(r.Namespace, "tiflash", ioChaosConfigTiFlash))
-		}
-	}
+	//for _, name := range strings.Split(fixture.Context.Nemesis, ",") {
+	//	name := strings.TrimSpace(name)
+	//	if len(name) == 0 {
+	//		continue
+	//	}
+	//	switch name {
+	//	case "delay_tikv", "errno_tikv", "mixed_tikv", "readerr_tikv":
+	//		r.TidbCluster.Spec.TiKV.Annotations = map[string]string{
+	//			"admission-webhook.pingcap.com/request": "chaosfs-tikv",
+	//		}
+	//		r.InjectionConfigMaps = append(r.InjectionConfigMaps,
+	//			newIOChaosConfigMap(r.Namespace, "tikv", ioChaosConfigTiKV))
+	//	case "delay_pd", "errno_pd", "mixed_pd":
+	//		r.TidbCluster.Spec.PD.Annotations = map[string]string{
+	//			"admission-webhook.pingcap.com/request": "chaosfs-pd",
+	//		}
+	//		r.InjectionConfigMaps = append(r.InjectionConfigMaps,
+	//			newIOChaosConfigMap(r.Namespace, "pd", ioChaosConfigPD))
+	//	case "delay_tiflash", "errno_tiflash", "mixed_tiflash", "readerr_tiflash":
+	//		r.TidbCluster.Spec.TiFlash.Annotations = map[string]string{
+	//			"admission-webhook.pingcap.com/request": "chaosfs-tiflash",
+	//		}
+	//		r.InjectionConfigMaps = append(r.InjectionConfigMaps,
+	//			newIOChaosConfigMap(r.Namespace, "tiflash", ioChaosConfigTiFlash))
+	//	}
+	//}
 	return r
 }
 

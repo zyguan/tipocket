@@ -53,7 +53,8 @@ ARGS="--store=tikv \
 --advertise-address=${POD_NAME}.${HEADLESS_SERVICE_NAME}.${NAMESPACE}.svc \
 --host=0.0.0.0 \
 --path=${CLUSTER_NAME}-pd:2379 \
---config=/etc/tidb/tidb.toml
+--config=/etc/tidb/tidb.toml \
+--log-file={{.LogDir}}
 "
 
 if [[ X${BINLOG_ENABLED:-} == Xtrue ]]
@@ -79,6 +80,7 @@ exec /tidb-server ${ARGS}
 
 // StartScriptModel ...
 type StartScriptModel struct {
+	LogDir      string
 	ClusterName string
 	Failpoints  string
 }
@@ -154,6 +156,7 @@ ARGS="--data-dir={{.DataDir}} \
 --client-urls=http://0.0.0.0:2379 \
 --advertise-client-urls=http://${domain}:2379 \
 --config=/etc/pd/pd.toml \
+--log-file={{.LogDir}}
 "
 
 if [[ -f {{.DataDir}}/join ]]
@@ -183,6 +186,7 @@ exec /pd-server ${ARGS}
 // PDStartScriptModel ...
 type PDStartScriptModel struct {
 	DataDir string
+	LogDir  string
 }
 
 // RenderPDStartScript ...
@@ -233,10 +237,18 @@ ARGS="--pd=http://${CLUSTER_NAME}-pd:2379 \
 --status-addr=0.0.0.0:20180 \
 --data-dir={{.DataDir}} \
 --capacity=${CAPACITY} \
---config=/etc/tikv/tikv.toml
+--config=/etc/tikv/tikv.toml \
+--log-file={{.LogDir}}
 "
 
+if [ ! -z "${STORE_LABELS:-}" ]; then
+  LABELS=" --labels ${STORE_LABELS} "
+  ARGS="${ARGS}${LABELS}"
+fi
+
 echo "starting tikv-server ..."
+echo "log is writing to {{.LogDir}}..."
+
 echo "/tikv-server ${ARGS}"
 exec /tikv-server ${ARGS}
 `))
@@ -244,6 +256,7 @@ exec /tikv-server ${ARGS}
 // TiKVStartScriptModel ...
 type TiKVStartScriptModel struct {
 	DataDir   string
+	LogDir    string
 	MasterKey string
 }
 
@@ -273,36 +286,36 @@ func RenderPumpConfig(model *pumpConfigModel) (string, error) {
 }
 
 const (
-	ioChaosConfigTiKV = `name: chaosfs-tikv
-selector:
-  labelSelectors:
-    "app.kubernetes.io/component": "tikv"
-template: sidecar-template
-arguments:
-  ContainerName: "tikv"
-  DataPath: "/var/lib/tikv/data"
-  MountPath: "/var/lib/tikv"
-  VolumeName: "tikv"`
-
-	ioChaosConfigPD = `name: chaosfs-pd
-selector:
-  labelSelectors:
-    "app.kubernetes.io/component": "pd"
-template: sidecar-template
-arguments:
-  ContainerName: "pd"
-  DataPath: "/var/lib/pd/data"
-  MountPath: "/var/lib/pd"
-  VolumeName: "pd"`
-
-	ioChaosConfigTiFlash = `name: chaosfs-tiflash
-selector:
-  labelSelectors:
-    "app.kubernetes.io/component": "tiflash"
-template: sidecar-template
-arguments:
-  ContainerName: "tiflash"
-  DataPath: "/data0/db"
-  MountPath: "/data0"
-  VolumeName: "data0"`
+//	ioChaosConfigTiKV = `name: chaosfs-tikv
+//selector:
+//  labelSelectors:
+//    "app.kubernetes.io/component": "tikv"
+//template: sidecar-template
+//arguments:
+//  ContainerName: "tikv"
+//  DataPath: "/var/lib/tikv/data"
+//  MountPath: "/var/lib/tikv"
+//  VolumeName: "tikv"`
+//
+//	ioChaosConfigPD = `name: chaosfs-pd
+//selector:
+//  labelSelectors:
+//    "app.kubernetes.io/component": "pd"
+//template: sidecar-template
+//arguments:
+//  ContainerName: "pd"
+//  DataPath: "/var/lib/pd/data"
+//  MountPath: "/var/lib/pd"
+//  VolumeName: "pd"`
+//
+//	ioChaosConfigTiFlash = `name: chaosfs-tiflash
+//selector:
+//  labelSelectors:
+//    "app.kubernetes.io/component": "tiflash"
+//template: sidecar-template
+//arguments:
+//  ContainerName: "tiflash"
+//  DataPath: "/data0/db"
+//  MountPath: "/data0"
+//  VolumeName: "data0"`
 )

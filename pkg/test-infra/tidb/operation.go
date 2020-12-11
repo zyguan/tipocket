@@ -46,14 +46,16 @@ import (
 )
 
 const (
-	tikvDir     = "/var/lib/tikv"
+	// Since v1.1.7, tidb-operator supports to mount multiple pvs to tidb, pd and tikv
+	// https://github.com/pingcap/tidb-operator/releases/tag/v1.1.7
+	tidbLogDir  = "/var/log/tidblog/tidb.log"
 	tikvDataDir = "/var/lib/tikv/data"
-	pdDir       = "/var/lib/pd"
+	tikvLogDir  = "/var/lib/tikv/tikv.log"
 	pdDataDir   = "/var/lib/pd/data"
+	pdLogDir    = "/var/lib/pd/pd.log"
 	// used for tikv data encryption
 	tikvEncryptionMasterKey = "c7fd825f4ec91c07067553896cb1b4ad9e32e9175e7750aa39cc1771fc8eb589"
-
-	ioChaosAnnotation = "admission-webhook.pingcap.com/request"
+	//ioChaosAnnotation       = "admission-webhook.pingcap.com/request"
 )
 
 // Ops knows how to operate TiDB
@@ -148,17 +150,17 @@ func (o *Ops) Apply() error {
 	tm := o.tc.TidbMonitor
 	desired := tc.DeepCopy()
 
-	if len(o.tc.InjectionConfigMaps) > 0 {
-		log.Info("Apply IO Chaos configs")
-		if err := o.applyInjectionConfigMaps(); err != nil {
-			return err
-		}
-	}
+	//if len(o.tc.InjectionConfigMaps) > 0 {
+	//	log.Info("Apply IO Chaos configs")
+	//	if err := o.applyInjectionConfigMaps(); err != nil {
+	//		return err
+	//	}
+	//}
 
-	log.Info("Apply tidb discovery")
-	if err := o.applyDiscovery(tc); err != nil {
-		return err
-	}
+	//log.Info("Apply tidb discovery")
+	//if err := o.applyDiscovery(tc); err != nil {
+	//	return err
+	//}
 	log.Info("Apply tidb configmap")
 	if err := o.applyTiDBConfigMap(tc, o.config.TiDBConfig); err != nil {
 		return err
@@ -513,10 +515,10 @@ func readBase64AsString(base64config string) (string, error) {
 }
 
 func getPDConfigMap(tc *v1alpha1.TidbCluster) (*corev1.ConfigMap, error) {
-	scriptModel := &PDStartScriptModel{DataDir: pdDir}
-	if getIOChaosAnnotation(tc, "pd") == "chaosfs-pd" {
-		scriptModel.DataDir = pdDataDir
-	}
+	scriptModel := &PDStartScriptModel{DataDir: pdDataDir, LogDir: pdLogDir}
+	//if getIOChaosAnnotation(tc, "pd") == "chaosfs-pd" {
+	//	scriptModel.DataDir = pdDataDir
+	//}
 	s, err := RenderPDStartScript(scriptModel)
 	if err != nil {
 		return nil, err
@@ -533,7 +535,7 @@ func getPDConfigMap(tc *v1alpha1.TidbCluster) (*corev1.ConfigMap, error) {
 }
 
 func getTiDBConfigMap(tc *v1alpha1.TidbCluster) (*corev1.ConfigMap, error) {
-	s, err := RenderTiDBStartScript(&StartScriptModel{ClusterName: tc.Name, Failpoints: fixture.Context.TiDBFailpoint})
+	s, err := RenderTiDBStartScript(&StartScriptModel{ClusterName: tc.Name, LogDir: tidbLogDir, Failpoints: fixture.Context.TiDBFailpoint})
 	if err != nil {
 		return nil, err
 	}
@@ -549,10 +551,10 @@ func getTiDBConfigMap(tc *v1alpha1.TidbCluster) (*corev1.ConfigMap, error) {
 }
 
 func getTiKVConfigMap(tc *v1alpha1.TidbCluster) (*corev1.ConfigMap, error) {
-	scriptModel := &TiKVStartScriptModel{DataDir: tikvDir, MasterKey: tikvEncryptionMasterKey}
-	if getIOChaosAnnotation(tc, "tikv") == "chaosfs-tikv" {
-		scriptModel.DataDir = tikvDataDir
-	}
+	scriptModel := &TiKVStartScriptModel{DataDir: tikvDataDir, LogDir: tikvLogDir, MasterKey: tikvEncryptionMasterKey}
+	//if getIOChaosAnnotation(tc, "tikv") == "chaosfs-tikv" {
+	//	scriptModel.DataDir = tikvDataDir
+	//}
 	s, err := RenderTiKVStartScript(scriptModel)
 	if err != nil {
 		return nil, err
@@ -663,18 +665,18 @@ func (o *Ops) parseNodeFromPodList(pods *corev1.PodList) []cluster.Node {
 	return nodes
 }
 
-func (o *Ops) applyInjectionConfigMaps() error {
-	for _, tc := range o.tc.InjectionConfigMaps {
-		des := tc.DeepCopy()
-		if _, err := controllerutil.CreateOrUpdate(context.TODO(), o.cli, tc, func() error {
-			tc.Data = des.Data
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+//func (o *Ops) applyInjectionConfigMaps() error {
+//	for _, tc := range o.tc.InjectionConfigMaps {
+//		des := tc.DeepCopy()
+//		if _, err := controllerutil.CreateOrUpdate(context.TODO(), o.cli, tc, func() error {
+//			tc.Data = des.Data
+//			return nil
+//		}); err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 func getNodeIP(nodeList *corev1.NodeList) string {
 	if len(nodeList.Items) == 0 {
@@ -692,30 +694,30 @@ func getTiDBNodePort(svc *corev1.Service) int32 {
 	return 0
 }
 
-func getIOChaosAnnotation(tc *v1alpha1.TidbCluster, component string) string {
-	switch component {
-	case "tikv":
-		if tc.Spec.TiKV.Annotations != nil {
-			if s, ok := tc.Spec.TiKV.Annotations[ioChaosAnnotation]; ok {
-				return s
-			}
-		}
-	case "pd":
-		if tc.Spec.PD.Annotations != nil {
-			if s, ok := tc.Spec.PD.Annotations[ioChaosAnnotation]; ok {
-				return s
-			}
-		}
-	case "tiflash":
-		if tc.Spec.TiFlash.Annotations != nil {
-			if s, ok := tc.Spec.TiFlash.Annotations[ioChaosAnnotation]; ok {
-				return s
-			}
-		}
-	}
-
-	return ""
-}
+//func getIOChaosAnnotation(tc *v1alpha1.TidbCluster, component string) string {
+//	switch component {
+//	case "tikv":
+//		if tc.Spec.TiKV.Annotations != nil {
+//			if s, ok := tc.Spec.TiKV.Annotations[ioChaosAnnotation]; ok {
+//				return s
+//			}
+//		}
+//	case "pd":
+//		if tc.Spec.PD.Annotations != nil {
+//			if s, ok := tc.Spec.PD.Annotations[ioChaosAnnotation]; ok {
+//				return s
+//			}
+//		}
+//	case "tiflash":
+//		if tc.Spec.TiFlash.Annotations != nil {
+//			if s, ok := tc.Spec.TiFlash.Annotations[ioChaosAnnotation]; ok {
+//				return s
+//			}
+//		}
+//	}
+//
+//	return ""
+//}
 
 // GetTiDBConfig is used for Matrix-related setups
 func (o *Ops) GetTiDBConfig() *fixture.TiDBClusterConfig {
