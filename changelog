@@ -1,2 +1,0 @@
-* tikvEncryptionMasterKey
-* loki uses go.etcd.io/etcd, conflicts with github.com/etcd-io/etcd

@@ -45,13 +45,8 @@ type Controller struct {
 
 	proc         int64
 	requestCount int64
-
-	// TODO(yeya24): make log service an interface
-	//lokiClient *loki.Client
-	logPath    string
-
-	suit    verify.Suit
-	plugins []Plugin
+	suit         verify.Suit
+	plugins      []Plugin
 }
 
 // NewController creates a controller.
@@ -63,8 +58,6 @@ func NewController(
 	clientRequestGenerator func(ctx context.Context, client core.Client, node cluster.ClientNode, proc *int64, requestCount *int64, recorder *history.Recorder),
 	verifySuit verify.Suit,
 	plugins []Plugin,
-	//lokiCli *loki.Client,
-	logPath string,
 ) *Controller {
 	if db := core.GetDB(cfg.DB); db == nil {
 		log.Fatalf("database %s is not registered", cfg.DB)
@@ -75,7 +68,6 @@ func NewController(
 	c.nemesisGenerators = nemesisGenerators
 	c.clientRequestGenerator = clientRequestGenerator
 	c.suit = verifySuit
-	c.logPath = logPath
 	c.plugins = plugins
 
 	for _, node := range c.cfg.ClientNodes {

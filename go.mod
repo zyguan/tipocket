@@ -52,7 +52,7 @@ require (
 	github.com/pingcap/kvproto v0.0.0-20200927054727-1290113160f0
 	github.com/pingcap/parser v0.0.0-20200317021010-cd90cc2a7d87
 	github.com/pingcap/pd v2.1.17+incompatible
-	github.com/pingcap/pd/v4 v4.0.0 // indirect
+	github.com/pingcap/pd/v4 v4.0.0
 	github.com/pingcap/tidb v2.1.0-beta+incompatible
 	github.com/pingcap/tidb-operator v1.1.7
 	github.com/pingcap/tidb-tools v4.0.1-0.20200612040216-6ddacc75561c+incompatible

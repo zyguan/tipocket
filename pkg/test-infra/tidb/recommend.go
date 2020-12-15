@@ -161,10 +161,10 @@ func RecommendedTiDBCluster(ns, name string, clusterConfig fixture.TiDBClusterCo
 					},
 					StorageClassName: &fixture.Context.LocalVolumeStorageClass,
 					StorageVolumes: []v1alpha1.StorageVolume{{
-						Name:             "log",
+						Name: "log",
 						// 50Gi for tidb_general_log
-						StorageSize:      "50Gi",
-						MountPath:        "/var/log/tidblog",
+						StorageSize: "50Gi",
+						MountPath:   "/var/log/tidblog",
 					}},
 					// disable auto fail over
 					MaxFailoverCount: pointer.Int32Ptr(int32(0)),
