@@ -1,6 +1,6 @@
 module github.com/pingcap/tipocket
 
-go 1.13
+go 1.14
 
 require (
 	github.com/BurntSushi/toml v0.3.1
@@ -30,24 +30,20 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/juju/errors v0.0.0-20190930114154-d42613fe1ab9
 	github.com/mailru/easyjson v0.7.6 // indirect
-	github.com/mattn/go-colorable v0.1.7 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mgechev/revive v1.0.2
 	github.com/minio/minio-go/v7 v7.0.5
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/ngaut/log v0.0.0-20180314031856-b8e36e7ba5ac
 	github.com/pingcap/advanced-statefulset v0.3.2
-	github.com/pingcap/errors v0.11.5-0.20190809092503-95897b64e011
-	github.com/pingcap/failpoint v0.0.0-20200702092429-9f69995143ce // indirect
+	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3
 	github.com/pingcap/go-tpc v0.0.0-20200229030315-98ee0f8f09d3
-	github.com/pingcap/kvproto v0.0.0-20200324130106-b8bc94dd8a36
-	github.com/pingcap/log v0.0.0-20200511115504-543df19646ad
-	github.com/pingcap/parser v0.0.0-20200317021010-cd90cc2a7d87
+	github.com/pingcap/kvproto v0.0.0-20201126113434-70db5fb4b0dc
+	github.com/pingcap/log v0.0.0-20201112100606-8f1e84a3abc8
+	github.com/pingcap/parser v0.0.0-20210107054750-53e33b4018fe
 	github.com/pingcap/pd v2.1.17+incompatible
-	github.com/pingcap/pd/v4 v4.0.0-beta.1.0.20200305072537-61d9f9cc35d3
 	github.com/pingcap/tidb v2.1.0-beta+incompatible
 	github.com/pingcap/tidb-operator v1.1.0-rc.3
-	github.com/pingcap/tidb-tools v4.0.1-0.20200612040216-6ddacc75561c+incompatible
+	github.com/pingcap/tidb-tools v4.0.9-0.20201127090955-2707c97b3853+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rogpeppe/fastuuid v1.2.0
 	github.com/satori/go.uuid v1.2.0
@@ -55,13 +51,13 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/stretchr/testify v1.5.1
 	github.com/tikv/client-go v0.0.0-20200110101306-a3ebdb020c83
+	github.com/tikv/pd v0.0.0-20210105112549-e5be7fd38659
 	github.com/uber-go/atomic v1.5.0
-	go.uber.org/zap v1.14.0
+	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
-	golang.org/x/sys v0.0.0-20200918174421-af09f7315aff // indirect
-	golang.org/x/tools v0.0.0-20200921210052-fa0125251cc4 // indirect
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/tools v0.0.0-20210106214847-113979e3529a // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.19.2
@@ -74,10 +70,7 @@ require (
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.26.0
 
-// we use pingcap/pd and pingcap/pd/v4 at the same time, which will cause a panic because pd register prometheus metrics two times.
-replace github.com/pingcap/pd => github.com/mahjonp/pd v1.1.0-beta.0.20200408110858-9c088a87390c
-
-replace github.com/pingcap/tidb => github.com/pingcap/tidb v0.0.0-20200317142013-5268094afe05
+replace github.com/pingcap/tidb => github.com/pingcap/tidb v1.1.0-beta.0.20210107141342-a3fdbe5ad46b
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v1.8.2-0.20200213233353-b90be6f32a33
 

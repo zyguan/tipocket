@@ -23,12 +23,12 @@ func (s Suit) Verify(historyFile string) {
 	}
 	ops, state, err := history.ReadHistory(historyFile, s.Parser)
 	if err != nil {
-		log.Fatalf("verify failed: %v", err)
+		log.Fatalf("read history: %v", err)
 	}
 
 	ops, err = history.CompleteOperations(ops, s.Parser)
 	if err != nil {
-		log.Fatalf("verify failed: %v", err)
+		log.Fatalf("process operations: %v", err)
 	}
 
 	if s.Model != nil {

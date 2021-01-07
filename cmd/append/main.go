@@ -20,7 +20,13 @@ var (
 )
 
 func main() {
+	var clusterName string
+	flag.StringVar(&clusterName, "cluster-name", "", "tidb cluster name")
 	flag.Parse()
+
+	if len(clusterName) == 0 {
+		clusterName = fixture.Context.Namespace
+	}
 
 	suit := util.Suit{
 		Config: &control.Config{
@@ -39,7 +45,7 @@ func main() {
 			Checker: listappend.AppendChecker{},
 			Parser:  listappend.AppendParser{},
 		},
-		ClusterDefs: test_infra.NewDefaultCluster(fixture.Context.Namespace, fixture.Context.Namespace,
+		ClusterDefs: test_infra.NewDefaultCluster(fixture.Context.Namespace, clusterName,
 			fixture.Context.TiDBClusterConfig),
 	}
 	suit.Run(context.Background())

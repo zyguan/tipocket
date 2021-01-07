@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"regexp"
 
 	"github.com/pingcap/tipocket/pkg/test-infra/fixture"
@@ -28,7 +27,7 @@ func NewK8sClusterProvider() Provider {
 // SetUp sets up cluster, returns err or all nodes info
 func (k *K8sProvider) SetUp(_ context.Context, spec Specs) ([]Node, []ClientNode, error) {
 	if err := k.CreateNamespace(spec.Namespace); err != nil {
-		return nil, nil, errors.New("failed to create namespace " + spec.Namespace)
+		return nil, nil, err
 	}
 	if err := spec.Cluster.Apply(); err != nil {
 		return nil, nil, err
