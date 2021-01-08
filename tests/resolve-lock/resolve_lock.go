@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ngaut/log"
@@ -36,7 +37,7 @@ type Config struct {
 // Normalize normalizes unexpected config
 func (c *Config) Normalize() *Config {
 	if c.RegionCount == 0 {
-		c.RegionCount = 1000
+		c.RegionCount = 200
 	}
 	if c.LockPerRegion == 0 {
 		c.LockPerRegion = 10
@@ -80,6 +81,10 @@ type resolveLockClient struct {
 func (c *resolveLockClient) openDB(ctx context.Context, ip string, port int32) error {
 	dsn := fmt.Sprintf("root@tcp(%s:%d)/", ip, port)
 	db, err := util.OpenDB(dsn, 1)
+	if err != nil {
+		return errors.Trace(err)
+	}
+	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", c.dbName))
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -207,10 +212,11 @@ func (c *resolveLockClient) Start(ctx context.Context, cfg interface{}, clientNo
 			return err
 		}
 		log.Infof("[round-%d] start to generate locks at ts(%v)", loopNum, ts)
-		err = c.generateLocks(ctx, time.Microsecond)
+		locked, err := c.generateLocks(ctx, time.Microsecond)
 		if err != nil {
 			return errors.Trace(err)
 		}
+		log.Infof("[round-%d] generated %d locks at ts(%v)", loopNum, locked, ts)
 
 		// Sleep to let locks are applied in all replicas.
 		time.Sleep(5 * time.Second)
@@ -235,7 +241,7 @@ func (c *resolveLockClient) Start(ctx context.Context, cfg interface{}, clientNo
 
 		if greenGCUsed {
 			lastGreenGC = loopNum
-		} else {
+		} else if c.EnableGreenGC {
 			log.Warnf("[round-%d] failed to resolve lock physically at safe point %v", loopNum, c.safePoint)
 		}
 		if c.EnableGreenGC && loopNum-lastGreenGC > 50 {
@@ -286,83 +292,92 @@ func (c *resolveLockClient) asyncGenerateLocksDuringGC(ctx context.Context, safe
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		c.generateLocks(ctx, interval)
+		locked, err := c.generateLocks(ctx, interval)
+		log.Infof("async generated %d locks during GC. Err: %v", locked, err)
 	}()
 	return cancel, &wg
 }
 
-func (c *resolveLockClient) generateLocks(ctx context.Context, interval time.Duration) error {
+func (c *resolveLockClient) generateLocks(ctx context.Context, interval time.Duration) (int, error) {
 	type task struct {
 		tableID  int64
 		handleID int64
 		limit    int
 	}
+	type res struct {
+		locked int
+		err    error
+	}
 
 	workers := c.Worker
 	taskCh := make(chan task, len(c.tableIDs))
-	errCh := make(chan error, workers)
+	resCh := make(chan res, workers)
 	for i := 0; i < workers; i++ {
 		go func() {
+			locked := 0
 			for task := range taskCh {
-				err := c.lock(ctx, task.tableID, task.handleID, task.limit)
+				cnt, err := c.lock(ctx, task.tableID, task.handleID, task.limit)
 				if err != nil {
-					errCh <- err
+					resCh <- res{0, err}
 					return
 				}
+				locked += cnt
 			}
-			errCh <- nil
+			resCh <- res{locked, nil}
 		}()
 	}
 
-	var err error
 	ticker := time.NewTicker(interval)
 	for _, tableID := range c.tableIDs {
 		select {
 		case <-ctx.Done():
 			break
-		case err = <-errCh:
-			workers--
-			break
 		case <-ticker.C:
 			taskCh <- task{tableID: tableID, handleID: c.handleID, limit: c.LockPerRegion}
 		}
 	}
-
 	close(taskCh)
+
+	var err error
+	locked := 0
 	for i := 0; i < workers; i++ {
-		e := <-errCh
+		res := <-resCh
 		if err == nil {
-			err = e
+			err = res.err
 		}
+		locked += res.locked
 	}
-	return err
+	return locked, err
 }
 
-func (c *resolveLockClient) lock(ctx context.Context, tableID int64, handleID int64, limit int) error {
+func (c *resolveLockClient) lock(ctx context.Context, tableID int64, handleID int64, limit int) (int, error) {
 	const txnSize = 5
 
+	locked := 0
 	keys := make([][]byte, 0, txnSize)
 	for i := 0; i < limit; i++ {
 		keys = append(keys, tablecodec.EncodeRowKeyWithHandle(tableID, handleID+int64(i)))
 		if len(keys) >= txnSize || i == limit-1 {
-			_, err := c.lockBatch(ctx, keys, keys[0])
+			cnt, err := c.lockBatch(ctx, keys, keys[0])
 			if err != nil {
-				return errors.Trace(err)
+				return 0, errors.Trace(err)
 			}
+			locked += cnt
 			keys = keys[:0]
 		}
 	}
-	return nil
+	return locked, nil
 }
 
 func (c *resolveLockClient) lockBatch(ctx context.Context, keys [][]byte, primary []byte) (int, error) {
-	const maxBatchSize = 16 * 1024
+	const maxBatchSize = 1024 * 1024
 
 	// TiKV client doesn't expose Prewrite interface directly. We need to manually locate the region and send the
 	// Prewrite requests.
 	for {
+		primary := keys[0]
 		bo := tikv.NewBackoffer(ctx, 60000)
-		loc, err := c.kv.GetRegionCache().LocateKey(bo, keys[0])
+		loc, err := c.kv.GetRegionCache().LocateKey(bo, primary)
 		if err != nil {
 			return 0, errors.Trace(err)
 		}
@@ -373,7 +388,7 @@ func (c *resolveLockClient) lockBatch(ctx context.Context, keys [][]byte, primar
 			return 0, errors.Trace(err)
 		}
 
-		// Pick a batch of keys and make up the mutations
+		// Write locks in the same region. It doesn't handle region errors or write conflict properly for simplicity.
 		batchSize := 0
 		var mutations []*kvrpcpb.Mutation
 		for _, key := range keys {
@@ -409,7 +424,7 @@ func (c *resolveLockClient) lockBatch(ctx context.Context, keys [][]byte, primar
 		)
 
 		// Send the requests
-		resp, err := c.kv.SendReq(bo, req, loc.Region, time.Second*20)
+		resp, err := c.kv.SendReq(bo, req, loc.Region, time.Second*60)
 		if err != nil {
 			return 0, errors.Annotatef(err, "send request failed. region: %+v [%+q, %+q), keys: %+q", loc.Region, loc.StartKey, loc.EndKey, keys[0:lockedKeys])
 		}
@@ -432,6 +447,12 @@ func (c *resolveLockClient) lockBatch(ctx context.Context, keys [][]byte, primar
 		// if len(keyErrors) != 0 {
 		// return 0, errors.New(fmt.Sprintf("fail to prewrite locks: %v", keyErrors))
 		// }
+		prewriteResp := resp.Resp.(*kvrpcpb.PrewriteResponse)
+		keyErrors := prewriteResp.GetErrors()
+		if len(keyErrors) != 0 {
+			log.Warnf("failed to write locks: %v", keyErrors)
+			lockedKeys = 0
+		}
 
 		return lockedKeys, nil
 	}
@@ -535,6 +556,6 @@ func (c *resolveLockClient) getLockTs(ctx context.Context) (uint64, error) {
 	if c.mockLockTs == 0 {
 		return c.getTs(ctx)
 	}
-	c.mockLockTs--
-	return c.mockLockTs, nil
+	// decrement
+	return atomic.AddUint64(&c.mockLockTs, ^uint64(0)), nil
 }
