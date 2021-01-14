@@ -37,7 +37,14 @@ var (
 )
 
 func main() {
+	var clusterName string
+	flag.StringVar(&clusterName, "cluster-name", "", "tidb cluster name")
 	flag.Parse()
+
+	if len(clusterName) == 0 {
+		clusterName = fixture.Context.Namespace
+	}
+
 	cfg := control.Config{
 		Mode:         control.Mode(fixture.Context.Mode),
 		ClientCount:  fixture.Context.ClientCount,
@@ -65,7 +72,7 @@ func main() {
 		VerifySuit:       verifySuit,
 		Provider:         cluster.NewDefaultClusterProvider(),
 		NemesisGens:      util.ParseNemesisGenerators(fixture.Context.Nemesis),
-		ClusterDefs:      test_infra.NewDefaultCluster(fixture.Context.Namespace, fixture.Context.Namespace, fixture.Context.TiDBClusterConfig),
+		ClusterDefs:      test_infra.NewDefaultCluster(fixture.Context.Namespace, clusterName, fixture.Context.TiDBClusterConfig),
 	}
 	suit.Run(context.Background())
 }

@@ -138,8 +138,6 @@ func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes [
 
 	if c.asyncCommit {
 		_, err = db.Exec("set @@global.tidb_enable_async_commit = 1;")
-	} else {
-		_, err = db.Exec("set @@global.tidb_enable_async_commit = 0;")
 	}
 	if err != nil {
 		log.Fatalf("[bank2Client] set async commit failed: %v", err)
@@ -147,8 +145,6 @@ func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes [
 
 	if c.onePC {
 		_, err = db.Exec("set @@global.tidb_enable_1pc = 1;")
-	} else {
-		_, err = db.Exec("set @@global.tidb_enable_1pc = 0;")
 	}
 	if err != nil {
 		log.Fatalf("[bank2Client] set 1PC failed: %v", err)

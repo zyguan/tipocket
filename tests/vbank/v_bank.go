@@ -79,9 +79,6 @@ func (c *Client) genCreateTableSQL(i int) string {
 
 func (c *Client) genInitialInsertSQL(id int) string {
 	rowID := id
-	if !c.cfg.Partition {
-		rowID = 0
-	}
 	return fmt.Sprintf("insert into %s (id, balance, created_at) VALUES (%s, %d, '%.19s')",
 		c.getTableName(id), c.idValue(rowID), vbInitialBalance, time.Now(),
 	)
@@ -328,7 +325,7 @@ func (c *Client) getWhereClause(accID int) string {
 	if c.cfg.Range {
 		return fmt.Sprintf("id >= %s", c.idValue(0))
 	}
-	return fmt.Sprintf("id = %s", c.idValue(0))
+	return fmt.Sprintf("id = %s", c.idValue(accID))
 }
 
 func (c *Client) idValue(id int) string {
@@ -435,16 +432,16 @@ func (c *Client) invokeRead(ctx context.Context) (*BankState, error) {
 func (c *Client) invokeReadMultiTable(ctx context.Context) (result *BankState, err error) {
 	result = &BankState{}
 	for i := 0; i < vbAccountNum; i++ {
-		var balance float64
-		err = c.tx.QueryRowContext(ctx, "select balance from "+c.getTableName(i)).Scan(&balance)
-		if err == sql.ErrNoRows {
+		var balance sql.NullFloat64
+		err = c.tx.QueryRowContext(ctx, "select sum(balance) from "+c.getTableName(i)).Scan(&balance)
+		if !balance.Valid {
 			continue
 		}
 		if err != nil {
 			log.Error(c.logStr(err))
 			return
 		}
-		result.append(i, balance)
+		result.append(i, balance.Float64)
 	}
 	return
 }
