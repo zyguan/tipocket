@@ -668,8 +668,11 @@ func (c *Client) invokeDeleteAccount(ctx context.Context) (res *DeleteResult, er
 	selectVictimForUpdate := fmt.Sprintf(selectForUpdateFmt, c.getTableName(res.VictimID), c.getWhereClause(res.VictimID))
 	err = c.tx.QueryRowContext(ctx, selectVictimForUpdate).Scan(&res.Balance)
 	if err != nil {
-		res.Aborted = err == sql.ErrNoRows
-		return res, nil
+		if err == sql.ErrNoRows {
+			res.Aborted = true
+			return res, nil
+		}
+		return
 	}
 	deleteStmt := fmt.Sprintf("DELETE FROM %s WHERE %s", c.getTableName(res.VictimID), c.getWhereClause(res.VictimID))
 	_, err = c.tx.ExecContext(ctx, deleteStmt)

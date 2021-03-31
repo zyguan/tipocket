@@ -16,6 +16,7 @@ import (
 
 	"github.com/pingcap/tipocket/pkg/cluster"
 	"github.com/pingcap/tipocket/pkg/core"
+	"github.com/pingcap/tipocket/pkg/util/fail"
 	"github.com/pingcap/tipocket/util"
 )
 
@@ -99,6 +100,8 @@ type bank2Client struct {
 	stop  int32
 	txnID int32
 	db    *sql.DB
+
+	fail *fail.Client
 }
 
 func (c *bank2Client) padLength(table int) int {
@@ -115,14 +118,18 @@ func (c *bank2Client) padLength(table int) int {
 	return minLen + rand.Intn(maxLen-minLen)
 }
 
-func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes []cluster.ClientNode, idx int) error {
+func (c *bank2Client) SetUp(ctx context.Context, nodes []cluster.Node, clientNodes []cluster.ClientNode, idx int) error {
 	if idx != 0 {
 		return nil
 	}
 
 	var err error
 	node := clientNodes[idx]
-	dsn := fmt.Sprintf("root@tcp(%s:%d)/%s", node.IP, node.Port, c.DbName)
+	txnMode := "pessimistic"
+	if rand.Float64() < .5 {
+		txnMode = "optimistic"
+	}
+	dsn := fmt.Sprintf("root@tcp(%s:%d)/%s?tidb_general_log=1&tidb_txn_mode=%s", node.IP, node.Port, c.DbName, txnMode)
 
 	log.Infof("start to init...")
 	db, err := util.OpenDB(dsn, 1)
@@ -131,10 +138,6 @@ func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes [
 	}
 	util.RandomlyChangeReplicaRead(c.String(), c.ReplicaRead, db)
 
-	_, err = db.Exec("set @@global.tidb_txn_mode = 'pessimistic';")
-	if err != nil {
-		log.Fatalf("[bank2Client] set txn_mode failed: %v", err)
-	}
 	time.Sleep(5 * time.Second)
 	c.db, err = util.OpenDB(dsn, c.Concurrency)
 	util.RandomlyChangeReplicaRead(c.String(), c.ReplicaRead, c.db)
@@ -224,10 +227,30 @@ func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes [
 	}
 
 	c.startVerify(ctx, db)
-	return nil
+
+	_, err = db.Exec("update mysql.tidb set variable_value='72h' where variable_name='tikv_gc_life_time'")
+	if err != nil {
+		return err
+	}
+	c.fail = fail.New()
+	for _, n := range nodes {
+		if n.Component == cluster.TiDB {
+			err = c.fail.AddEndpoint(fail.KindTiDB, n.IP, 10080)
+		} else if n.Component == cluster.TiKV {
+			err = c.fail.AddEndpoint(fail.KindTiKV, n.IP, 20180)
+		}
+		if err != nil {
+			log.Warnf("cannot add %s to fail client, please check the binary", n.IP)
+		}
+	}
+	// TODO: make preset configurable
+	return c.fail.Enable(fail.Presets["async-commit"], true)
 }
 
 func (c *bank2Client) TearDown(ctx context.Context, nodes []cluster.ClientNode, idx int) error {
+	if c.fail != nil {
+		c.fail.Disable(fail.Presets["async-commit"], false)
+	}
 	return nil
 }
 
@@ -330,7 +353,8 @@ func (c *bank2Client) verify(db *sql.DB) {
 		if strings.Contains(errStr, "1105") &&
 			!(strings.Contains(errStr, "cancelled DDL job") ||
 				strings.Contains(errStr, "Information schema is changed") ||
-				strings.Contains(errStr, "TiKV server timeout")) {
+				strings.Contains(errStr, "TiKV server timeout") ||
+				strings.Contains(errStr, "injected")) {
 			atomic.StoreInt32(&c.stop, 1)
 			c.wg.Wait()
 			log.Fatalf("[%s] ADMIN CHECK TABLE bank2_accounts fails: %v", c, err)
