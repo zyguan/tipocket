@@ -17,6 +17,7 @@ import (
 	"github.com/pingcap/tipocket/pkg/cluster"
 	"github.com/pingcap/tipocket/pkg/core"
 	"github.com/pingcap/tipocket/pkg/history"
+	"github.com/pingcap/tipocket/pkg/util/fail"
 )
 
 // primary key types
@@ -139,10 +140,12 @@ type Client struct {
 	db  *sql.DB
 	tx  *sql.Tx
 	cfg *Config
+
+	fail *fail.Client
 }
 
 // SetUp implements the core.Client interface.
-func (c *Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes []cluster.ClientNode, idx int) error {
+func (c *Client) SetUp(ctx context.Context, nodes []cluster.Node, clientNodes []cluster.ClientNode, idx int) error {
 	c.idx = idx
 	c.r = rand.New(rand.NewSource(time.Now().UnixNano()))
 	node := clientNodes[idx]
@@ -178,13 +181,30 @@ func (c *Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes []clus
 			return err
 		}
 	}
-	return nil
+	_, err = db.Exec("update mysql.tidb set variable_value='72h' where variable_name='tikv_gc_life_time'")
+	if err != nil {
+		return err
+	}
+	c.fail = fail.New()
+	for _, n := range nodes {
+		if n.Component == cluster.TiDB {
+			err = c.fail.AddEndpoint(fail.KindTiDB, n.IP, 10080)
+		} else if n.Component == cluster.TiKV {
+			err = c.fail.AddEndpoint(fail.KindTiKV, n.IP, 20180)
+		}
+		if err != nil {
+			log.Warnf("cannot add %s to fail client, please check the binary", n.IP)
+		}
+	}
+	// TODO: make preset configurable
+	return c.fail.Enable(fail.Presets["async-commit"], true)
 }
 
 // TearDown implements the core.Client interface.
 func (c *Client) TearDown(ctx context.Context, nodes []cluster.ClientNode, idx int) error {
 	if c.idx == 0 {
 		c.dropTables(ctx)
+		c.fail.Disable(fail.Presets["async-commit"], false)
 	}
 	return c.db.Close()
 }
@@ -647,8 +667,8 @@ func (c *Client) invokeDeleteAccount(ctx context.Context) (res *DeleteResult, er
 	res.VictimID = c.r.Intn(9) + 1
 	selectVictimForUpdate := fmt.Sprintf(selectForUpdateFmt, c.getTableName(res.VictimID), c.getWhereClause(res.VictimID))
 	err = c.tx.QueryRowContext(ctx, selectVictimForUpdate).Scan(&res.Balance)
-	if err == sql.ErrNoRows {
-		res.Aborted = true
+	if err != nil {
+		res.Aborted = err == sql.ErrNoRows
 		return res, nil
 	}
 	deleteStmt := fmt.Sprintf("DELETE FROM %s WHERE %s", c.getTableName(res.VictimID), c.getWhereClause(res.VictimID))
