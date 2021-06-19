@@ -223,7 +223,7 @@ func (c *bank2Client) SetUp(ctx context.Context, _ []cluster.Node, clientNodes [
 		log.Fatalf("[%s] insert system account err: %v", c, err)
 	}
 
-	c.startVerify(ctx, db)
+	c.startVerify(ctx, db, time.Now())
 	return nil
 }
 
@@ -261,8 +261,9 @@ func (c *bank2Client) Start(ctx context.Context, cfg interface{}, clientNodes []
 	return nil
 }
 
-func (c *bank2Client) startVerify(ctx context.Context, db *sql.DB) {
-	c.verify(db)
+func (c *bank2Client) startVerify(ctx context.Context, db *sql.DB, startTime time.Time) {
+	time.Sleep(time.Second)
+	c.verify(db, startTime)
 
 	go func() {
 		for {
@@ -270,25 +271,40 @@ func (c *bank2Client) startVerify(ctx context.Context, db *sql.DB) {
 			case <-ctx.Done():
 				return
 			case <-time.After(c.Config.Interval):
-				c.verify(db)
+				c.verify(db, startTime)
 			}
 		}
 	}()
 }
 
-func (c *bank2Client) verify(db *sql.DB) {
-	tx, err := db.Begin()
+func (c *bank2Client) verify(db *sql.DB, minTime time.Time) {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
 	if err != nil {
-		_ = errors.Trace(err)
+		log.Errorf("[%s] connect failed: %+v", c, err)
+		return
+	}
+	defer conn.Close()
+
+	readTime := time.Now().Add(time.Duration(10 * float64(time.Second) * rand.NormFloat64()))
+	if readTime.Sub(minTime) < 0 {
+		readTime = minTime
+	}
+	ts := readTime.Format("2006-01-02 15:04:05.000")
+	_, err = conn.ExecContext(ctx, "start transaction read only as of timestamp '"+ts+"'")
+	if err != nil {
+		log.Errorf("[%s] start transaction with ts=%q : %+v", c, ts, err)
 		return
 	}
 	defer func() {
-		_ = tx.Rollback()
+		if _, err := conn.ExecContext(ctx, "rollback"); err != nil {
+			log.Errorf("[%s] rollback failed: %+v", c, err)
+		}
 	}()
 
 	if tidbDatabase {
 		var tso uint64
-		if err = tx.QueryRow("SELECT @@tidb_current_ts").Scan(&tso); err == nil {
+		if err = conn.QueryRowContext(ctx, "SELECT @@tidb_current_ts").Scan(&tso); err == nil {
 			log.Infof("[%s] SELECT SUM(balance) to verify use tso %d", c, tso)
 		}
 	}
@@ -299,8 +315,8 @@ func (c *bank2Client) verify(db *sql.DB) {
 	// query with IndexScan
 	uuid := fastuuid.MustNewGenerator().Hex128()
 	query := fmt.Sprintf("SELECT SUM(balance) AS total, '%s' as uuid FROM bank2_accounts", uuid)
-	if err = tx.QueryRow(query).Scan(&total, &uuid); err != nil {
-		_ = errors.Trace(err)
+	if err = conn.QueryRowContext(ctx, query).Scan(&total, &uuid); err != nil {
+		log.Errorf("[%s] %s -> %+v", c, query, err)
 		return
 	}
 	if total != expectTotal {
@@ -313,8 +329,8 @@ func (c *bank2Client) verify(db *sql.DB) {
 	// query with TableScan
 	uuid = fastuuid.MustNewGenerator().Hex128()
 	query = fmt.Sprintf("SELECT SUM(balance) AS total, '%s' as uuid FROM bank2_accounts ignore index(byBalance)", uuid)
-	if err = tx.QueryRow(query).Scan(&total, &uuid); err != nil {
-		_ = errors.Trace(err)
+	if err = conn.QueryRowContext(ctx, query).Scan(&total, &uuid); err != nil {
+		log.Errorf("[%s] %s -> %+v", c, query, err)
 		return
 	}
 	if total != expectTotal {
@@ -324,13 +340,13 @@ func (c *bank2Client) verify(db *sql.DB) {
 		log.Fatalf("[%s] bank2_accounts total should be %d, but got %d, query uuid is %s", c, expectTotal, total, uuid)
 	}
 
-	if _, err := tx.Exec("ADMIN CHECK TABLE bank2_accounts"); err != nil {
+	if _, err := conn.ExecContext(ctx, "ADMIN CHECK TABLE bank2_accounts"); err != nil {
 		log.Errorf("[%s] ADMIN CHECK TABLE bank2_accounts fails: %v", c, err)
 		errStr := err.Error()
 		if strings.Contains(errStr, "1105") &&
 			!(strings.Contains(errStr, "cancelled DDL job") ||
 				strings.Contains(errStr, "Information schema is changed") ||
-				strings.Contains(errStr, "TiKV server timeout") || 
+				strings.Contains(errStr, "TiKV server timeout") ||
 				strings.Contains(errStr, "redirect failed") ||
 				strings.Contains(errStr, "no leader") ||
 				strings.Contains(errStr, "injected")) {
